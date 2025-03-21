@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Download, MapPin, Wind, AlertTriangle } from 'lucide-react';
-import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 
 interface AnalysisFormData {
   address: string;
@@ -121,11 +121,23 @@ const AnalysisPDF = ({ data }: { data: AnalysisResult }) => (
   <Document>
     <Page size="A4" style={styles.page}>
       <Text style={styles.title}>Urban Area Analysis Report</Text>
-      
+
       <View style={styles.section}>
         <Text style={styles.header}>Location Information</Text>
         <Text style={styles.text}>Address: {data.address}</Text>
         <Text style={styles.text}>Coordinates: {data.latitude}, {data.longitude}</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.header}>Map</Text>
+        {data.still_map_image && data.still_map_image !== "data:image/png;base64,None" ?
+          (<Image
+            src={data.still_map_image}
+            style={{ width: '100%', height: 200 }}
+          />
+          ) : (
+            <Text style={styles.text}>Map image not available</Text>
+          )}
       </View>
 
       <View style={styles.section}>
@@ -139,10 +151,12 @@ const AnalysisPDF = ({ data }: { data: AnalysisResult }) => (
         <Text style={styles.text}>Recommendation: {data.nearby_places_recommendation}</Text>
         {data.Nearby_places.suggestedLocations.map((place, index) => (
           <View key={index} style={{ marginBottom: 5 }}>
-            <Text style={styles.text}>• {place.placeName} ({place.distance}m)</Text>
+            <Text style={styles.text}> • {place.placeName} ({place.distance}m)</Text>
           </View>
         ))}
       </View>
+
+
     </Page>
   </Document>
 );
@@ -163,7 +177,7 @@ const Analysis = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await fetch('http://127.0.0.1:8000/aggregate-endpoint', {
         method: 'POST',
@@ -175,13 +189,13 @@ const Analysis = () => {
           keywords: formData.keywords.split(',').map(k => k.trim()),
         }),
       });
-  
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
-  
+
       const data: AnalysisResult = await response.json(); // Ensure response is correctly parsed
-  
+
       setAnalysisResult(data);
     } catch (error) {
       console.error('Error:', error);
@@ -200,12 +214,11 @@ const Analysis = () => {
             <PDFDownloadLink
               document={<AnalysisPDF data={analysisResult} />}
               fileName="urban-analysis-report.pdf"
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2"
-            >
-              {({ loading }) => (
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2" >
+              {({ loading, error }) => (
                 <>
                   <Download className="w-5 h-5" />
-                  {loading ? 'Generating...' : 'Get Report'}
+                  {loading ? 'Generating...' : error ? 'Error generating PDF' : 'Get Report'}
                 </>
               )}
             </PDFDownloadLink>
@@ -324,6 +337,23 @@ const Analysis = () => {
               </div>
             </div>
 
+            {/* Still Map Image */}
+            {analysisResult.still_map_image && analysisResult.still_map_image !== "data:image/png;base64,None" ? (
+              <div className="bg-white rounded-lg shadow-lg p-8">
+                <h2 className="text-2xl font-semibold text-green-800 mb-4">Location Map</h2>
+                <img
+                  src={analysisResult.still_map_image}
+                  alt="Still Map"
+                  className="w-full h-auto rounded-lg border border-gray-300"
+                />
+              </div>
+            ) : (
+              <div className="bg-gray-100 rounded-lg flex items-center justify-center p-8 h-64">
+                <p className="text-gray-500">Still map image not available</p>
+              </div>
+            )}
+
+
             {/* Air Quality */}
             <div className="bg-white rounded-lg shadow-lg p-8">
               <div className="flex items-center gap-3 mb-4">
@@ -401,6 +431,8 @@ const Analysis = () => {
                 ))}
               </div>
             </div>
+
+
           </div>
         )}
       </div>
